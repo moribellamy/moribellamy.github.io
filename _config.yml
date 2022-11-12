@@ -1,6 +1,7 @@
 name: "invoked.net"
 
 url: 'https://invoked.net'
+baseurl: /_site/
 
 markdown: kramdown
 markdown_ext: "md"
