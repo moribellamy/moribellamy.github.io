@@ -1,0 +1,16 @@
+name: "invoked.net"
+
+url: 'https://invoked.net'
+
+markdown: kramdown
+markdown_ext: "md"
+highlighter: rouge
+
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
+
+permalink: /:year-:month-:day-:title/
+
+source: .
+destination: ./_site
