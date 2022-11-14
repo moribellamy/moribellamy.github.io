@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" CONTENT="script-src 'self'; frame-src 'self' ghbtns.com *.youtube.com; object-src 'self'">
+    <title>
+       Empty Q() objects in Django 
+    </title>
+
+    <link
+      rel="stylesheet"
+      href="https://moribellamy.github.io/assets/css/montserrat.css"
+      type="text/css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://moribellamy.github.io/assets/css/style.css"
+      type="text/css"
+    />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Favicon stuff from favicon.io -->
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="/img/favicon/apple-touch-icon.png"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="/img/favicon/favicon-32x32.png"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="16x16"
+      href="/img/favicon/favicon-16x16.png"
+    />
+    <link rel="manifest" href="/img/favicon/site.webmanifest" />
+  </head>
+
+  <body>
+    <div id="wrapper">
+      <header>
+  <h1><a href="https://moribellamy.github.io/">invoked.net</a></h1>
+</header>
+<div>
+  <a href="https://moribellamy.github.io/">Home</a> |
+  <a href="https://moribellamy.github.io/about/">About</a> |
+  <a href="https://moribellamy.github.io/feed.xml">RSS</a>
+</div>
+<hr />
+ <h1>Empty Q() objects in Django</h1>
+<div class="separator"></div>
+<div class="post-content">
+  <p>As Django developers know, the ORM uses python <code class="highlighter-rouge">**kwargs</code> to specify filtering criterion. From <a href="https://docs.djangoproject.com/en/2.2/topics/db/queries/#complex-lookups-with-q-objects">their own documentation</a>, we have the example:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">django.db.models</span> <span class="kn">import</span> <span class="n">Q</span>
+<span class="n">Q</span><span class="p">(</span><span class="n">question__startswith</span><span class="o">=</span><span class="s">'What'</span><span class="p">)</span>
+<span class="n">Q</span><span class="p">(</span><span class="n">question__startswith</span><span class="o">=</span><span class="s">'Who'</span><span class="p">)</span> <span class="o">|</span> <span class="n">Q</span><span class="p">(</span><span class="n">question__startswith</span><span class="o">=</span><span class="s">'What'</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>So, for example, these would be passed to an ORM method so it knows which SQL to generate:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">results</span> <span class="o">=</span> <span class="n">Poll</span><span class="p">.</span><span class="n">objects</span><span class="p">.</span><span class="n">get</span><span class="p">(</span>
+    <span class="n">Q</span><span class="p">(</span><span class="n">question__startswith</span><span class="o">=</span><span class="s">'Who'</span><span class="p">),</span>
+    <span class="n">Q</span><span class="p">(</span><span class="n">pub_date</span><span class="o">=</span><span class="n">date</span><span class="p">(</span><span class="mi">2005</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span> <span class="o">|</span> <span class="n">Q</span><span class="p">(</span><span class="n">pub_date</span><span class="o">=</span><span class="n">date</span><span class="p">(</span><span class="mi">2005</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">6</span><span class="p">))</span>
+<span class="p">)</span>
+</code></pre></div></div>
+
+<h2 id="weird-behavior">Weird Behavior</h2>
+
+<p>That’s fine and good. There’s interesting semantics, though, if you omit kwargs from the <code class="highlighter-rouge">Q()</code> constructor (which is perfectly valid python). For example:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">In</span> <span class="p">[</span><span class="mi">1</span><span class="p">]:</span> <span class="n">Address</span><span class="p">.</span><span class="n">objects</span><span class="p">.</span><span class="nb">all</span><span class="p">().</span><span class="n">count</span><span class="p">()</span>
+<span class="n">Out</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span> <span class="mi">39789</span>
+
+<span class="n">In</span> <span class="p">[</span><span class="mi">2</span><span class="p">]:</span> <span class="n">Address</span><span class="p">.</span><span class="n">objects</span><span class="p">.</span><span class="nb">filter</span><span class="p">(</span><span class="n">Q</span><span class="p">()).</span><span class="n">count</span><span class="p">()</span>
+<span class="n">Out</span><span class="p">[</span><span class="mi">2</span><span class="p">]:</span> <span class="mi">39789</span>
+
+<span class="n">In</span> <span class="p">[</span><span class="mi">3</span><span class="p">]:</span> <span class="n">Address</span><span class="p">.</span><span class="n">objects</span><span class="p">.</span><span class="nb">filter</span><span class="p">(</span><span class="n">Q</span><span class="p">()</span> <span class="o">|</span> <span class="n">Q</span><span class="p">(</span><span class="n">city</span><span class="o">=</span><span class="s">'boston'</span><span class="p">)).</span><span class="n">count</span><span class="p">()</span>
+<span class="n">Out</span><span class="p">[</span><span class="mi">3</span><span class="p">]:</span> <span class="mi">28</span>
+</code></pre></div></div>
+
+<p>In entry (2), we can see an empty Q() appears to be a noop. <em>But hold up</em>. Example 3 uses the vertical bar operator, which in the whole universe of programming has traditionally meant “or”, “union”, or “disjunction”. And it’s actually <a href="https://docs.djangoproject.com/en/2.2/topics/db/queries/#complex-lookups-with-q-objects">no different in Django</a>.</p>
+
+<p>And last time I checked, <em>the union operator is not supposed to make a set smaller.</em></p>
+
+<h2 id="so-what">So what?</h2>
+
+<p>Well, it’s certainly surprising. But it’s been that way for a long time, definitely too long to change without wreaking havoc on developers. <a href="https://code.djangoproject.com/ticket/24279">At least one person was confused before</a>.</p>
+
+<p>My personal theory is that this behavior evolved organically with the following (anti?) pattern:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># OK, time to dynamically make my queryset criteria...
+</span><span class="n">query</span> <span class="o">=</span> <span class="n">Q</span><span class="p">()</span>
+<span class="k">for</span> <span class="n">thing</span> <span class="ow">in</span> <span class="n">things</span><span class="p">:</span>
+    <span class="n">query</span> <span class="o">=</span> <span class="n">query</span> <span class="o">|</span> <span class="n">Q</span><span class="p">(</span><span class="n">my_field__iexact</span><span class="o">=</span><span class="n">thing</span><span class="p">)</span>
+
+<span class="c1"># Sweet, I'll match anything in `things`.
+</span></code></pre></div></div>
+
+<p>I’ve almost fallen into that pattern myself, and I’ve seen it in other codebases. Squinting, most programmers would find this at least superficially reasonable. Start with an empty-ish thing (<code class="highlighter-rouge">Q()</code>) and programatically add criteria.</p>
+
+<p>In fact, the current implementation works as the above example intends. But I consider it pretty risky. It doesn’t jive with typical set theory, and some of us are kind of used to thinking in those terms. What made me feel better is:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">query</span> <span class="o">=</span> <span class="n">Q</span><span class="p">(</span><span class="n">my_field__iexact</span><span class="o">=</span><span class="n">things</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+<span class="k">for</span> <span class="n">thing</span> <span class="ow">in</span> <span class="n">things</span><span class="p">[</span><span class="mi">1</span><span class="p">:]:</span>
+    <span class="n">query</span> <span class="o">=</span> <span class="n">query</span> <span class="o">|</span> <span class="n">Q</span><span class="p">(</span><span class="n">my_field__iexact</span><span class="o">=</span><span class="n">thing</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>A clever use of <a href="https://docs.python.org/2/library/functions.html#reduce">reduce</a> would also do the trick, but for my money the more mathematical higher level functions are becoming less pythonic (for better or for worse).</p>
+
+</div>
+
+      <hr />
+    </div>
+    <!--<p><small> <i>Build with <a href="https://jekyllrb.com/">Jekyll</a> and  <a href="https://github.com/cyevgeniy/jekyll-true-minimal/">true minimal theme</a></i> </small></p>-->
+  </body>
+</html>

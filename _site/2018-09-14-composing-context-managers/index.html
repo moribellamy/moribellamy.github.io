@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" CONTENT="script-src 'self'; frame-src 'self' ghbtns.com *.youtube.com; object-src 'self'">
+    <title>
+       Composing Context Managers in Python 
+    </title>
+
+    <link
+      rel="stylesheet"
+      href="https://moribellamy.github.io/assets/css/montserrat.css"
+      type="text/css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://moribellamy.github.io/assets/css/style.css"
+      type="text/css"
+    />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Favicon stuff from favicon.io -->
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="/img/favicon/apple-touch-icon.png"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="/img/favicon/favicon-32x32.png"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="16x16"
+      href="/img/favicon/favicon-16x16.png"
+    />
+    <link rel="manifest" href="/img/favicon/site.webmanifest" />
+  </head>
+
+  <body>
+    <div id="wrapper">
+      <header>
+  <h1><a href="https://moribellamy.github.io/">invoked.net</a></h1>
+</header>
+<div>
+  <a href="https://moribellamy.github.io/">Home</a> |
+  <a href="https://moribellamy.github.io/about/">About</a> |
+  <a href="https://moribellamy.github.io/feed.xml">RSS</a>
+</div>
+<hr />
+ <h1>Composing Context Managers in Python</h1>
+<div class="separator"></div>
+<div class="post-content">
+  <p>Let’s say you have a custom <a href="https://www.python.org/dev/peps/pep-0343/">context manager</a>.
+Without loss of generality, consider:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">class</span> <span class="nc">MyGreeter</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="bp">self</span><span class="p">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
+
+    <span class="k">def</span> <span class="nf">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">print</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">name</span><span class="p">,</span> <span class="s">'saying hello.'</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">name</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_val</span><span class="p">,</span> <span class="n">exc_tb</span><span class="p">):</span>
+        <span class="k">print</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">name</span><span class="p">,</span> <span class="s">'saying goodbye.'</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">False</span>
+
+
+<span class="k">with</span> <span class="n">MyGreeter</span><span class="p">(</span><span class="s">'Mori'</span><span class="p">)</span> <span class="k">as</span> <span class="n">thing</span><span class="p">:</span>
+    <span class="k">print</span><span class="p">(</span><span class="n">thing</span><span class="p">)</span>
+
+<span class="c1"># Output:
+# Mori saying hello.
+# 4
+# Mori saying goodbye.
+</span></code></pre></div></div>
+
+<p>This is fine, but you might want to extend the functionality and depend on
+another context manager. Let’s say, in the above example, we wanted to print
+the message to a temporary file instead of to the console. Typical usage of
+<code class="highlighter-rouge">NamedTemporaryFile</code> would look like this:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">tempfile</span>
+
+<span class="k">with</span> <span class="n">tempfile</span><span class="p">.</span><span class="n">NamedTemporaryFile</span><span class="p">()</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+    <span class="n">f</span><span class="p">.</span><span class="n">write</span><span class="p">(</span><span class="s">'...'</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>But now we’re in trouble. We’d like f to be accessible in the <code class="highlighter-rouge">__enter__</code> and
+<code class="highlighter-rouge">__exit__</code> methods. But we can’t have a reusable class defined inside of a
+<code class="highlighter-rouge">with</code> construct.</p>
+
+<p>So the question is, how do we compose these two context managers while still
+being mindful of failure semantics?</p>
+
+<h2 id="solution-1-invoke-context-manager-methods-directly">Solution 1: Invoke context manager methods directly</h2>
+
+<p>Something like this would work:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">tempfile</span>
+
+<span class="k">class</span> <span class="nc">MyGreeter</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="bp">self</span><span class="p">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="bp">self</span><span class="p">.</span><span class="n">tempfile_manager</span> <span class="o">=</span> <span class="n">tempfile</span><span class="p">.</span><span class="n">NamedTemporaryFile</span><span class="p">(</span>
+            <span class="n">mode</span><span class="o">=</span><span class="s">'w'</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s">'utf-8'</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="p">.</span><span class="n">tempfile</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">tempfile_manager</span><span class="p">.</span><span class="n">__enter__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="p">.</span><span class="n">tempfile</span><span class="p">.</span><span class="n">write</span><span class="p">(</span><span class="s">'{} saying hello'</span><span class="p">.</span><span class="nb">format</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">name</span><span class="p">))</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="p">.</span><span class="n">tempfile</span>  <span class="c1"># or whatever
+</span>
+    <span class="k">def</span> <span class="nf">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_val</span><span class="p">,</span> <span class="n">exc_tb</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="p">.</span><span class="n">tempfile</span><span class="p">.</span><span class="n">write</span><span class="p">(</span><span class="s">'{} saying goodbye'</span><span class="p">.</span><span class="nb">format</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">name</span><span class="p">))</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="p">.</span><span class="n">tempfile_manager</span><span class="p">.</span><span class="n">__exit__</span><span class="p">(</span><span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_val</span><span class="p">,</span> <span class="n">exc_tb</span><span class="p">)</span>
+            
+<span class="k">with</span> <span class="n">MyGreeter</span><span class="p">(</span><span class="s">'Bob'</span><span class="p">)</span> <span class="k">as</span> <span class="n">thing</span><span class="p">:</span>
+    <span class="k">pass</span>
+</code></pre></div></div>
+
+<p>Recall that, according to the <a href="https://www.python.org/dev/peps/pep-0343/">specification</a>
+ for ContextManagers, the three parameters to <code class="highlighter-rouge">__exit__</code> identify a currently
+handled exception. If no exception is currently being handled, all three values
+are None. Furthermore, <code class="highlighter-rouge">__exit__</code> returns True if a currently handled exception
+should be re-thrown, or False if it should be swallowed.</p>
+
+<p>This enables ContextManagers to ease cognitive load of their users – if certain
+exceptions are recoverable, the author can do the recovery logic inside the CM
+itself.</p>
+
+<p>Our simple Greeter has no special semantics for exception handling, so we defer
+to our inner CM tempfile_manager. If an exception is currently being handled,
+maybe <code class="highlighter-rouge">NamedTemporaryFile</code> will want to do something special with it.</p>
+
+<p>Beware though: When composing CMs like this, you could in theory swallow
+exceptions that someone up the stack expected to see for their API to recover
+properly. So if you catch any of these exceptions, you should probably
+re-<code class="highlighter-rouge">raise</code>.</p>
+
+<h2 id="solution-2-use-the-contextlib-decorator">Solution 2: Use the <code class="highlighter-rouge">contextlib</code> decorator</h2>
+
+<p>If you have no exception handling semantics, you can use something much more
+concise.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">contextlib</span>
+<span class="kn">import</span> <span class="nn">tempfile</span>
+
+<span class="o">@</span><span class="n">contextlib</span><span class="p">.</span><span class="n">contextmanager</span>
+<span class="k">def</span> <span class="nf">my_greeter</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
+    <span class="k">with</span> <span class="n">tempfile</span><span class="p">.</span><span class="n">NamedTemporaryFile</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s">'w'</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s">'utf-8'</span><span class="p">)</span> <span class="k">as</span> <span class="n">temp</span><span class="p">:</span>
+        <span class="n">temp</span><span class="p">.</span><span class="n">write</span><span class="p">(</span><span class="s">'{} saying hello</span><span class="se">\n</span><span class="s">'</span><span class="p">.</span><span class="nb">format</span><span class="p">(</span><span class="n">name</span><span class="p">))</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">yield</span> <span class="n">name</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="n">temp</span><span class="p">.</span><span class="n">write</span><span class="p">(</span><span class="s">'{} saying goodbye</span><span class="se">\n</span><span class="s">'</span><span class="p">.</span><span class="nb">format</span><span class="p">(</span><span class="n">name</span><span class="p">))</span>
+</code></pre></div></div>
+
+<p>The cool thing is, since generators pass exceptions through to the consumer,
+NamedTemporaryFile gets to see the exceptions it was counting on seeing.</p>
+
+</div>
+
+      <hr />
+    </div>
+    <!--<p><small> <i>Build with <a href="https://jekyllrb.com/">Jekyll</a> and  <a href="https://github.com/cyevgeniy/jekyll-true-minimal/">true minimal theme</a></i> </small></p>-->
+  </body>
+</html>
