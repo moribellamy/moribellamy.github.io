@@ -1,6 +1,8 @@
 name: "invoked.net"
 
 url: 'https://moribellamy.github.io'
+
+# Comment out in devel:
 baseurl: /_site/
 
 markdown: kramdown

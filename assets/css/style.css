@@ -10,6 +10,25 @@ body {
   grid-column-end: rm;
 }
 
+.image-container {
+  text-align: center; /* Centers the content */
+  margin: auto; /* Centers the container */
+  border: 2px solid black;
+  padding: 20px;
+  display: inline-block;
+}
+
+img {
+  display: block; /* Ensures it's a block-level element */
+  margin: 0 auto; /* Centers the image within the container */
+}
+
+.caption {
+  color: grey;
+  font-style: italic;
+}
+
+
 small {
   color: gray;
   font-style: italic;
