@@ -4,6 +4,11 @@ title: My Favorite Open Source Involvement Through 2023
 tags: foss
 ---
 
+Much of my activity is browsable on [my GitHub account page](https://github.com/moribellamy).
+As such, I am part of the honored group which has code buried
+[deep in the Svalbard archipelago](https://archiveprogram.github.com/arctic-vault/). So
+that's pretty neat :).
+
 * TOC
 {:toc}
 
@@ -13,12 +18,6 @@ tags: foss
   </div>
   <p class="caption">GNU, the cultural trend-setter for FOSS in a capitalist world.</p>
 </div>
-
-# Overview
-Much of my activity is browsable on [my GitHub account page](https://github.com/moribellamy).
-As such, I am part of the honored group which has code buried
-[deep in the Svalbard archipelago](https://archiveprogram.github.com/arctic-vault/). So
-that's pretty neat :).
 
 # Hadoop (2008)
 I had a pleasant summer internship at Apple one year, researching if Hadoop could replace
